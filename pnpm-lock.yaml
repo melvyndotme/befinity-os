@@ -300,6 +300,9 @@ importers:
       '@ocavue/tsconfig':
         specifier: ^0.7.1
         version: 0.7.1
+      '@types/node':
+        specifier: ^24.13.4
+        version: 24.13.4
       '@types/react':
         specifier: ^19.3.0
         version: 19.3.0
