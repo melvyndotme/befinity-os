@@ -1,0 +1,9 @@
+{
+  "extends": "@ocavue/tsconfig/dom/app.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true
+  },
+  "include": ["src/**/*", "vite.config.ts"]
+}

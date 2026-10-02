@@ -8,6 +8,9 @@
       "path": "./apps/extension/tsconfig.json"
     },
     {
+      "path": "./apps/web/tsconfig.json"
+    },
+    {
       "path": "./packages/core/tsconfig.json"
     },
     {
