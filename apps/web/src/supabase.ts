@@ -1,10 +1,10 @@
 import { createClient } from '@supabase/supabase-js'
 
-const url = import.meta.env.VITE_SUPABASE_URL
-const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
+const url: unknown = import.meta.env.VITE_SUPABASE_URL
+const publishableKey: unknown = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
 
 export const supabase =
-  url && publishableKey
+  typeof url === 'string' && typeof publishableKey === 'string' && url && publishableKey
     ? createClient(url, publishableKey, {
         auth: {
           flowType: 'pkce',

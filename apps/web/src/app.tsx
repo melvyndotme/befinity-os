@@ -14,13 +14,19 @@ import {
   localDateKey,
   noteFilePath,
 } from './model'
-import { downloadMarkdown, loadDailyNote, saveDailyNote } from './storage'
+import { loadVaultFolder, saveVaultFolder } from './folder-storage'
+import {
+  clearCaptureDraft,
+  downloadMarkdown,
+  loadCaptureDraft,
+  loadDailyNote,
+  saveCaptureDraft,
+  saveDailyNote,
+} from './storage'
 import { supabase } from './supabase'
 import { VaultSetup } from './vault-setup'
 
 const dateKey = localDateKey()
-const initialNote = loadDailyNote(dateKey) ?? dailyNoteTemplate(dateKey)
-
 interface VaultRecord {
   id: string
   name: string
@@ -32,6 +38,7 @@ interface VaultRecord {
 export function App() {
   const [session, setSession] = useState<Session | null | undefined>(undefined)
   const [vault, setVault] = useState<VaultRecord | null | undefined>(undefined)
+  const [vaultLoadError, setVaultLoadError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!supabase) return
@@ -44,15 +51,26 @@ export function App() {
 
   useEffect(() => {
     if (!supabase || !session) {
-      setVault(undefined)
+      queueMicrotask(() => {
+        setVault(undefined)
+        setVaultLoadError(null)
+      })
       return
     }
-    setVault(undefined)
+    queueMicrotask(() => {
+      setVault(undefined)
+      setVaultLoadError(null)
+    })
     void supabase
       .from('tact_notes_vaults')
       .select('id, name, local_folder_label, git_repository, encryption_mode')
       .maybeSingle()
       .then(({ data, error }) => {
+        setVaultLoadError(
+          error
+            ? `Your vault was saved, but TACT Notes could not reopen it: ${error.message}`
+            : null,
+        )
         setVault(error ? null : (data as VaultRecord | null))
       })
   }, [session])
@@ -61,8 +79,22 @@ export function App() {
   if (session === undefined) return <Loading message="Loading TACT Notes…" />
   if (!session) return <AuthScreen />
   if (vault === undefined) return <Loading message="Checking your vault…" />
-  if (!vault) return <VaultSetup userId={session.user.id} onComplete={() => setVault(undefined)} />
-  return <NotesWorkspace email={session.user.email ?? 'Signed-in user'} vault={vault} />
+  if (!vault) {
+    return (
+      <VaultSetup
+        loadError={vaultLoadError}
+        userId={session.user.id}
+        onComplete={() => setVault(undefined)}
+      />
+    )
+  }
+  return (
+    <NotesWorkspace
+      email={session.user.email ?? 'Signed-in user'}
+      userId={session.user.id}
+      vault={vault}
+    />
+  )
 }
 
 function Loading({ message }: { message: string }) {
@@ -89,9 +121,19 @@ function ConfigurationRequired() {
   )
 }
 
-function NotesWorkspace({ email, vault }: { email: string; vault: VaultRecord }) {
-  const [markdown, setMarkdown] = useState(initialNote)
-  const [capture, setCapture] = useState('')
+function NotesWorkspace({
+  email,
+  userId,
+  vault,
+}: {
+  email: string
+  userId: string
+  vault: VaultRecord
+}) {
+  const [markdown, setMarkdown] = useState(
+    () => loadDailyNote(dateKey) ?? dailyNoteTemplate(dateKey),
+  )
+  const [capture, setCapture] = useState(() => loadCaptureDraft(dateKey))
   const [folder, setFolder] = useState<DirectoryHandle | null>(null)
   const [status, setStatus] = useState(`Connected to ${vault.name}`)
   const captureRef = useRef<HTMLTextAreaElement>(null)
@@ -99,6 +141,31 @@ function NotesWorkspace({ email, vault }: { email: string; vault: VaultRecord })
   useEffect(() => {
     saveDailyNote(dateKey, markdown)
   }, [markdown])
+  useEffect(() => {
+    saveCaptureDraft(dateKey, capture)
+  }, [capture])
+  useEffect(() => {
+    if (!folder) return
+    void writeDailyNote(folder, dateKey, markdown).catch(() => {
+      setStatus('Reconnect your private vault before TACT Notes can save to the folder.')
+    })
+  }, [folder, markdown])
+  useEffect(() => {
+    let active = true
+    void loadVaultFolder(userId)
+      .then((savedFolder) => {
+        if (active && savedFolder) {
+          setFolder(savedFolder)
+          setStatus(`Private vault ready: ${savedFolder.name}`)
+        }
+      })
+      .catch(() => {
+        // The browser may require the user to reconnect a folder after a permission reset.
+      })
+    return () => {
+      active = false
+    }
+  }, [userId])
   useEffect(() => {
     function handleKeydown(event: KeyboardEvent) {
       if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
@@ -118,12 +185,14 @@ function NotesWorkspace({ email, vault }: { email: string; vault: VaultRecord })
     if (!capture.trim()) return
     setMarkdown((current) => appendCapture(current, capture))
     setCapture('')
+    clearCaptureDraft(dateKey)
     setStatus('Capture added to today’s note')
   }
 
   async function connectFolder() {
     try {
       const selected = await chooseFolder()
+      await saveVaultFolder(userId, selected)
       setFolder(selected)
       setStatus(`Local folder connected: ${selected.name}`)
     } catch (error) {
@@ -139,18 +208,6 @@ function NotesWorkspace({ email, vault }: { email: string; vault: VaultRecord })
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Could not write the note')
     }
-  }
-  async function connectCalendar() {
-    if (!supabase) return
-    setStatus('Opening Google consent for read-only Calendar access…')
-    const { error } = await supabase.auth.linkIdentity({
-      provider: 'google',
-      options: {
-        redirectTo: window.location.origin,
-        scopes: 'https://www.googleapis.com/auth/calendar.events.readonly',
-      },
-    })
-    if (error) setStatus(error.message)
   }
   async function signOut() {
     if (supabase) await supabase.auth.signOut()
@@ -264,9 +321,9 @@ function NotesWorkspace({ email, vault }: { email: string; vault: VaultRecord })
         </div>
         <div className="review-card">
           <p className="review-title">Calendar</p>
-          <p>Connect a Google calendar only when you want to turn an event into a local note.</p>
-          <button className="button button-quiet" onClick={() => void connectCalendar()}>
-            Connect read-only Google Calendar
+          <p>Google Calendar will be read-only and will let you turn an event into a local note.</p>
+          <button className="button button-quiet" disabled>
+            Calendar connection coming next
           </button>
         </div>
         <div className="review-card muted-card">

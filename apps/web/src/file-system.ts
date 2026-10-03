@@ -24,7 +24,7 @@ export async function chooseFolder(): Promise<DirectoryHandle> {
   if (!picker) {
     throw new Error('This browser does not support choosing a local folder yet.')
   }
-  return picker({ mode: 'readwrite' })
+  return await picker({ mode: 'readwrite' })
 }
 
 async function writeTextFile(

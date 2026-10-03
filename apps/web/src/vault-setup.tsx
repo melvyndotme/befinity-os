@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import { chooseFolder, initializeVault, type DirectoryHandle } from './file-system'
+import { saveVaultFolder } from './folder-storage'
 import { supabase } from './supabase'
 
 interface VaultSetupProps {
+  loadError: string | null
   userId: string
   onComplete(): void
 }
 
-export function VaultSetup({ userId, onComplete }: VaultSetupProps) {
+export function VaultSetup({ loadError, userId, onComplete }: VaultSetupProps) {
   const [folder, setFolder] = useState<DirectoryHandle | null>(null)
   const [name, setName] = useState('My TACT Notes')
   const [gitRepository, setGitRepository] = useState('')
@@ -18,6 +20,7 @@ export function VaultSetup({ userId, onComplete }: VaultSetupProps) {
     try {
       const selected = await chooseFolder()
       await initializeVault(selected)
+      await saveVaultFolder(userId, selected)
       setFolder(selected)
       setMessage(`Local vault prepared in “${selected.name}”.`)
     } catch (error) {
@@ -34,6 +37,20 @@ export function VaultSetup({ userId, onComplete }: VaultSetupProps) {
     }
     if (!supabase) {
       setMessage('TACT Notes account configuration is unavailable. Refresh the page and try again.')
+      return
+    }
+    if (!name.trim()) {
+      setMessage('Give your vault a name before saving.')
+      return
+    }
+    try {
+      const repositoryUrl = new URL(gitRepository)
+      if (repositoryUrl.protocol !== 'https:' || repositoryUrl.hostname !== 'github.com') {
+        setMessage('Enter the full HTTPS address of your private GitHub repository.')
+        return
+      }
+    } catch {
+      setMessage('Enter the full HTTPS address of your private GitHub repository.')
       return
     }
     setBusy(true)
@@ -54,6 +71,7 @@ export function VaultSetup({ userId, onComplete }: VaultSetupProps) {
         setMessage(`Could not save the vault setup: ${error.message}`)
         return
       }
+      setMessage('Vault saved. Opening your notes…')
       onComplete()
     } catch (error) {
       setMessage(
@@ -78,10 +96,10 @@ export function VaultSetup({ userId, onComplete }: VaultSetupProps) {
           Choose a folder outside iCloud. TACT Notes creates the Markdown structure there; it never
           uploads note contents to Supabase.
         </p>
-        <form className="auth-form" onSubmit={(event) => void saveSetup(event)}>
+        <form className="auth-form" noValidate onSubmit={(event) => void saveSetup(event)}>
           <label>
             Vault name
-            <input onChange={(event) => setName(event.target.value)} required value={name} />
+            <input onChange={(event) => setName(event.target.value)} value={name} />
           </label>
           <button className="button button-quiet" onClick={() => void selectFolder()} type="button">
             {folder ? `Local folder: ${folder.name}` : 'Choose a non-iCloud folder'}
@@ -91,8 +109,7 @@ export function VaultSetup({ userId, onComplete }: VaultSetupProps) {
             <input
               onChange={(event) => setGitRepository(event.target.value)}
               placeholder="https://github.com/you/tact-notes-vault"
-              required
-              type="url"
+              type="text"
               value={gitRepository}
             />
           </label>
@@ -105,9 +122,9 @@ export function VaultSetup({ userId, onComplete }: VaultSetupProps) {
           </button>
           {!folder && <p className="field-hint">Choose a local folder to enable saving.</p>}
         </form>
-        {message && (
+        {(message || loadError) && (
           <p className="auth-message" role="status">
-            {message}
+            {message || loadError}
           </p>
         )}
       </section>

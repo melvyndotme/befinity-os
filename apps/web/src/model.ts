@@ -12,18 +12,17 @@ export function localTimeLabel(date = new Date()): string {
 }
 
 export function dailyNoteTemplate(dateKey: string): string {
-  return `---\ndate: ${dateKey}\ntype: daily\n---\n\n# ${dateKey}\n\n## M-HAG\n\n$1m collected by July 2027. What is the smallest move today that compounds?\n\n`
+  return `---\ndate: ${dateKey}\ntype: daily\n---\n\n# ${dateKey}\n\n## M-HAG: $1m collected by July 2027. What is the smallest move today that compounds?\n\n`
 }
 
 export function appendCapture(current: string, text: string, capturedAt = new Date()): string {
-  const body = text.trim()
+  const body = text.trim().replaceAll(/\s*\n\s*/g, ' ')
   if (!body) return current
 
   const dateKey = localDateKey(capturedAt)
   const note = current.trim() || dailyNoteTemplate(dateKey).trim()
   const time = localTimeLabel(capturedAt)
-  const heading = `## ${time}`
-  return `${note}\n\n${heading}\n\n${body}\n`
+  return `${note}\n- ${time}: ${body}\n`
 }
 
 export function noteFilePath(dateKey: string): string {
