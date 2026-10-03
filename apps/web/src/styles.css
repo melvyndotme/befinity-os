@@ -1,7 +1,7 @@
 :root {
   color: #20253b;
   background: #f8fafa;
-  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
   font-synthesis: none;
 }
 
@@ -298,7 +298,7 @@ h2 {
 }
 kbd {
   color: #dcd9ff;
-  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
   font-size: 10px;
   margin-left: 5px;
 }
@@ -366,11 +366,14 @@ textarea:focus {
 .editor {
   border: 0;
   border-radius: 0;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 13px;
   line-height: 1.75;
   min-height: 410px;
   padding: 18px;
+}
+.capture-card textarea {
+  font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 .editor:focus {
   box-shadow: none;
