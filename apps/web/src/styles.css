@@ -45,10 +45,7 @@ kbd { color: #dcd9ff; font-family: ui-sans-serif, system-ui, sans-serif; font-si
 textarea { border: 1px solid #dfe3e9; border-radius: 8px; color: #20253b; outline: none; resize: vertical; width: 100%; }
 textarea:focus { border-color: #7370eb; box-shadow: 0 0 0 3px #e8e7ff; }
 .capture-card textarea { background: #fff; font-size: 14px; line-height: 1.55; padding: 10px 11px; }
-.capture-actions { align-items: center; display: flex; justify-content: space-between; gap: 12px; margin-top: 12px; }
-.lane-picker { display: flex; flex-wrap: wrap; gap: 5px; }
-.lane { background: transparent; border: 1px solid #dfe3e9; border-radius: 5px; color: #62697b; font-size: 11px; padding: 5px 8px; }
-.lane:hover, .lane-selected { background: #e8e7ff; border-color: #cac8ff; color: #4338ca; }
+.capture-actions { display: flex; justify-content: flex-end; margin-top: 12px; }
 .hint { color: #7b8191; font-size: 11px; line-height: 1.5; margin: 12px 0 0; }
 .editor-card { min-height: 440px; padding: 0; overflow: hidden; }
 .editor-label { border-bottom: 1px solid #eef0f4; color: #777e90; display: block; font-size: 11px; font-weight: 650; letter-spacing: .07em; padding: 12px 18px; text-transform: uppercase; }

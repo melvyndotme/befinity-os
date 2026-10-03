@@ -1,12 +1,3 @@
-export type CaptureLane = 'sell' | 'deliver' | 'build' | 'reflect'
-
-const laneLabels: Record<CaptureLane, string> = {
-  sell: 'Sell',
-  deliver: 'Deliver',
-  build: 'Build',
-  reflect: 'Reflect',
-}
-
 export function localDateKey(date = new Date()): string {
   const offset = date.getTimezoneOffset() * 60_000
   return new Date(date.getTime() - offset).toISOString().slice(0, 10)
@@ -27,7 +18,6 @@ export function dailyNoteTemplate(dateKey: string): string {
 export function appendCapture(
   current: string,
   text: string,
-  lane: CaptureLane,
   capturedAt = new Date(),
 ): string {
   const body = text.trim()
@@ -36,7 +26,7 @@ export function appendCapture(
   const dateKey = localDateKey(capturedAt)
   const note = current.trim() || dailyNoteTemplate(dateKey).trim()
   const time = localTimeLabel(capturedAt)
-  const heading = `## ${time} — ${laneLabels[lane]}`
+  const heading = `## ${time}`
   return `${note}\n\n${heading}\n\n${body}\n`
 }
 

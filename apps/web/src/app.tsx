@@ -1,22 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { chooseFolder, type DirectoryHandle, supportsFolderWriting, writeDailyNote } from './file-system'
-import { appendCapture, countOpenTasks, dailyNoteTemplate, localDateKey, noteFilePath, type CaptureLane } from './model'
+import { appendCapture, countOpenTasks, dailyNoteTemplate, localDateKey, noteFilePath } from './model'
 import { downloadMarkdown, loadDailyNote, saveDailyNote } from './storage'
 
 const dateKey = localDateKey()
 const initialNote = loadDailyNote(dateKey) ?? dailyNoteTemplate(dateKey)
 
-const lanes: Array<{ id: CaptureLane; label: string; detail: string }> = [
-  { id: 'sell', label: 'Sell', detail: 'A conversation, offer, or next commercial move.' },
-  { id: 'deliver', label: 'Deliver', detail: 'A client promise, training insight, or useful follow-through.' },
-  { id: 'build', label: 'Build', detail: 'A prototype, workflow, system, or learning edge.' },
-  { id: 'reflect', label: 'Reflect', detail: 'A decision, observation, or honest check-in.' },
-]
-
 export function App() {
   const [markdown, setMarkdown] = useState(initialNote)
   const [capture, setCapture] = useState('')
-  const [lane, setLane] = useState<CaptureLane>('reflect')
   const [folder, setFolder] = useState<DirectoryHandle | null>(null)
   const [status, setStatus] = useState('Saved privately in this browser')
   const captureRef = useRef<HTMLTextAreaElement>(null)
@@ -42,7 +34,7 @@ export function App() {
 
   function addCapture() {
     if (!capture.trim()) return
-    setMarkdown((current) => appendCapture(current, capture, lane))
+    setMarkdown((current) => appendCapture(current, capture))
     setCapture('')
     setStatus('Capture added to today’s note')
   }
@@ -68,8 +60,6 @@ export function App() {
     }
   }
 
-  const selectedLane = lanes.find((item) => item.id === lane)
-
   return (
     <main className="app-shell">
       <aside className="sidebar">
@@ -84,7 +74,7 @@ export function App() {
         <section className="mhag">
           <p className="eyebrow">M-HAG</p>
           <strong>$1m by July 2027</strong>
-          <p>Every capture should help you sell, deliver, build, or decide what to stop.</p>
+          <p>Capture the work first. Your daily review will make sense of it later.</p>
         </section>
 
         <div className="sidebar-footer">
@@ -104,11 +94,11 @@ export function App() {
             </button>
             {folder ? (
               <button className="button button-primary" onClick={() => void saveToFolder()}>
-                Save to folder
+                Save to private vault
               </button>
             ) : supportsFolderWriting() ? (
               <button className="button button-primary" onClick={() => void connectFolder()}>
-                Choose Markdown folder
+                Choose private vault
               </button>
             ) : null}
           </div>
@@ -128,23 +118,11 @@ export function App() {
             rows={3}
           />
           <div className="capture-actions">
-            <div className="lane-picker" aria-label="Capture lane">
-              {lanes.map((item) => (
-                <button
-                  className={item.id === lane ? 'lane lane-selected' : 'lane'}
-                  key={item.id}
-                  onClick={() => setLane(item.id)}
-                  title={item.detail}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
             <button className="button button-primary" onClick={addCapture}>
               Add to today <kbd>⌘↵</kbd>
             </button>
           </div>
-          <p className="hint">{selectedLane?.detail} Voice memos become local attachments and transcripts in the next slice.</p>
+          <p className="hint">No category required. Voice memos, daily review, and suggested links come after capture.</p>
         </section>
 
         <section className="editor-card">
@@ -175,11 +153,11 @@ export function App() {
         </div>
         <div className="review-card">
           <p className="review-title">Storage</p>
-          <p>Browser-local by default. A selected folder writes a portable <code>{noteFilePath(dateKey)}</code>.</p>
+          <p>Browser-local by default. Choose a cloned private vault to write <code>{noteFilePath(dateKey)}</code>.</p>
         </div>
         <div className="review-card muted-card">
-          <p className="review-title">Next build slice</p>
-          <p>Voice memo ingestion, review prompts, and a read-only work-log import—each kept as a separate, reviewable agent.</p>
+          <p className="review-title">Daily review agent</p>
+          <p>It will propose categories, links, tasks, and a short learning summary. You decide what becomes permanent.</p>
         </div>
       </aside>
     </main>
