@@ -18,24 +18,17 @@
   },
   "bundle": {
     "icon": [
-      "icons-dev/32x32.png",
-      "icons-dev/128x128.png",
-      "icons-dev/128x128@2x.png",
-      "icons-dev/icon.icns",
-      "icons-dev/icon.ico"
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
     ],
     "macOS": {
       "entitlements": "Entitlements.dev.plist",
       "files": {
         "embedded.provisionprofile": null
       }
-    }
-  },
-  "plugins": {
-    "updater": {
-      "endpoints": [
-        "https://github.com/team-reflect/reflect-open/releases/download/updater-dev-noop/latest.json"
-      ]
     }
   }
 }

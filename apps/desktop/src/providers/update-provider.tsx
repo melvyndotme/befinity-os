@@ -33,6 +33,10 @@ const UpdateContext = createContext<UpdateContextValue | null>(null)
 
 const IDLE: UpdateState = { phase: 'idle' }
 
+// TACT Notes has no signed update channel yet. Keep inherited updater code
+// inactive until TACT Notes owns a notarized release feed and signing key.
+const TACT_NOTES_UPDATER_ENABLED = false
+
 interface UpdateProviderProps {
   children: ReactNode
   /**
@@ -50,7 +54,7 @@ interface UpdateProviderProps {
  * any graph is open.
  */
 export function UpdateProvider({ children, autoCheck }: UpdateProviderProps): ReactElement {
-  const supported = isNativeShell()
+  const supported = isNativeShell() && TACT_NOTES_UPDATER_ENABLED
   const resolvedAutoCheck = autoCheck ?? (supported && !import.meta.env.DEV)
   const [controller, setController] = useState<UpdateController | null>(null)
 
