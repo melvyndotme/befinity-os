@@ -1,77 +1,47 @@
-import { useId, useState, type ReactElement, type ReactNode } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { icloudStatus } from '@reflect/core'
-import { Cloud, Folder, FolderPlus } from 'lucide-react'
-import { getIsComposing } from '@meowdown/core'
+import type { ReactElement, ReactNode } from 'react'
+import { Folder, FolderPlus } from 'lucide-react'
 import { InlineAlert } from '@/components/inline-alert.tsx'
-import { Badge } from '@/components/ui/badge.tsx'
 import { Button } from '@/components/ui/button.tsx'
-import { Input } from '@/components/ui/input.tsx'
-import { Spinner } from '@/components/ui/spinner.tsx'
-import { useBridgeReady } from '@/hooks/use-bridge-ready.ts'
 import { useGraphColors } from '@/hooks/use-graph-colors.ts'
-import { cleanGraphName, graphNameFromRoot, isGraphNameTaken } from '@/lib/graph-names.ts'
-import { queryKeys } from '@/lib/query-client.ts'
 import { graphColorCss } from '@/lib/graph-colors.ts'
 import { cn } from '@/lib/utils.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
 
-/** iCloud is a real option only in the macOS shell. */
-function isIcloudCapablePlatform(): boolean {
-  return import.meta.env.TAURI_ENV_PLATFORM === 'darwin'
-}
-
 /**
- * First-run / no-graph screen (Plan 21 UX pass). One decision, stated
- * plainly: where do your notes live? iCloud is the recommended default —
- * every graph already in the container is listed to open, and a name field
- * creates a new one right there. Choosing a folder yourself is the
- * self-managed path.
- *
- * The iCloud card uses "graph" only where the user is deciding between
- * existing containers and creating another one; the folder card talks about
- * folders.
+ * First-run / no-vault screen. TACT Notes is local-first: the person chooses
+ * the folder and TACT Notes keeps Markdown files exactly there.
  */
 export function GraphChooser(): ReactElement {
-  const { recents, error, pickAndOpen, openRecent, createAt, forget } = useGraph()
+  const { recents, error, pickAndOpen, openRecent, forget } = useGraph()
   const { colorFor } = useGraphColors()
-  const icloudCapable = isIcloudCapablePlatform()
 
   return (
     <ChooserShell>
       <div className="space-y-1.5 text-center">
-        <h1 className="text-2xl font-semibold tracking-tight text-text">Welcome to Reflect</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-text">Welcome to TACT Notes</h1>
         <p className="text-sm text-text-secondary">
-          Your notes are plain Markdown files. Open an existing folder or choose where new notes
-          live.
+          Your notes are plain Markdown files. Choose a local folder outside iCloud to create or
+          open your vault.
         </p>
       </div>
 
-      <div
-        className={cn(
-          'grid items-stretch gap-4',
-          icloudCapable ? 'sm:grid-cols-2' : 'mx-auto max-w-sm',
-        )}
-      >
-        {icloudCapable ? <IcloudCard openRecent={openRecent} createAt={createAt} /> : null}
-
-        {/* The self-managed path: any folder, synced however the user likes. */}
+      <div className="mx-auto grid w-full max-w-sm items-stretch gap-4">
         <section className="flex flex-col gap-4 rounded-xl border border-border bg-surface p-5 shadow-sm">
           <CardHeader
             icon={<Folder aria-hidden className="size-4" strokeWidth={1.75} />}
-            title="A folder you choose"
+            title="Your local TACT Notes vault"
           >
-            Open an existing Markdown folder on this {icloudCapable ? 'Mac' : 'computer'}. Reflect
-            keeps its files where they are.
+            Choose an existing folder or create a new one. TACT Notes keeps your Markdown files
+            there and does not use iCloud.
           </CardHeader>
           <Button
             type="button"
-            variant={icloudCapable ? 'outline' : 'default'}
+            variant="default"
             className="mt-auto w-full"
             onClick={() => void pickAndOpen()}
           >
             <FolderPlus aria-hidden strokeWidth={1.75} />
-            Choose a folder…
+            Choose or create a folder…
           </Button>
         </section>
       </div>
@@ -177,181 +147,6 @@ function CardHeader({
         </div>
         <p className="text-sm text-text-secondary">{children}</p>
       </div>
-    </div>
-  )
-}
-
-/** What the iCloud card is busy doing: opening one listed graph (its root) or
- * creating a new one — so only the pressed control shows the spinner. Roots
- * are absolute paths, so `'create'` can never collide with one. */
-type IcloudBusy = string | null
-
-/**
- * The recommended path. Lists every graph already in the container (a user
- * can keep several) with one-click Open, plus a name field to create a new
- * one; with no container (signed out / unentitled build) the copy is honest
- * and the action disabled.
- */
-function IcloudCard({
-  openRecent,
-  createAt,
-}: {
-  openRecent: (root: string) => Promise<boolean>
-  createAt: (root: string) => Promise<boolean>
-}): ReactElement {
-  const [typedName, setTypedName] = useState<string | null>(null)
-  const [busy, setBusy] = useState<IcloudBusy>(null)
-  const nameId = useId()
-  const bridgeReady = useBridgeReady()
-  const { data: status } = useQuery({
-    queryKey: queryKeys.icloud.status,
-    queryFn: icloudStatus,
-    enabled: bridgeReady,
-  })
-
-  const pending = busy !== null
-  const available = status?.available === true
-  const existing = status?.existingGraphRoots ?? []
-  // "Notes" pre-fills only the fresh-container form. Next to an existing
-  // list the row starts empty — a prefilled default would collide with the
-  // usual first graph ("Notes") and paint the screen invalid before the
-  // user touched it.
-  const name = typedName ?? (existing.length > 0 ? '' : 'Notes')
-  const cleanName = cleanGraphName(name)
-  // macOS folder names are case-insensitive — a same-named create would
-  // land inside the existing graph instead of next to it.
-  const nameTaken = cleanName !== null && isGraphNameTaken(cleanName, existing)
-
-  async function create(): Promise<void> {
-    if (status?.documentsRoot == null || cleanName === null || nameTaken) {
-      return
-    }
-    setBusy('create')
-    try {
-      await createAt(`${status.documentsRoot}/${cleanName}`)
-    } finally {
-      setBusy(null)
-    }
-  }
-
-  function open(root: string): void {
-    setBusy(root)
-    void openRecent(root).finally(() => setBusy(null))
-  }
-
-  return (
-    <section className="flex flex-col gap-4 rounded-xl border border-border bg-surface p-5 shadow-sm">
-      <CardHeader
-        icon={<Cloud aria-hidden className="size-4" strokeWidth={1.75} />}
-        title="iCloud"
-        badge={<Badge variant="secondary">Recommended</Badge>}
-        tinted
-      >
-        {existing.length > 0
-          ? 'Open an existing graph from iCloud Drive.'
-          : available
-            ? 'Syncs across your Mac and iPhone. Backed up automatically.'
-            : status === undefined
-              ? 'Checking iCloud…'
-              : 'Sign in to iCloud on this Mac to sync your notes across devices.'}
-      </CardHeader>
-      {existing.length > 0 ? (
-        <ul className="space-y-1.5">
-          {existing.map((root) => (
-            <li key={root}>
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full justify-start"
-                disabled={pending}
-                onClick={() => open(root)}
-              >
-                {busy === root ? <Spinner /> : <Cloud aria-hidden strokeWidth={1.75} />}
-                <span className="truncate">{graphNameFromRoot(root, 'your notes')}</span>
-              </Button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      {existing.length > 0 ? (
-        // Compact create row under the list: a new graph next to the
-        // existing ones is the secondary action here, not the headline.
-        <div className="mt-auto space-y-2">
-          <ChooserDivider>or create new graph</ChooserDivider>
-          <div className="flex gap-2">
-            <Input
-              aria-label="Name"
-              placeholder="New name"
-              value={name}
-              disabled={pending}
-              aria-invalid={nameTaken}
-              onChange={(event) => setTypedName(event.target.value)}
-              onKeyDown={(event) => {
-                if (getIsComposing()) {
-                  return
-                }
-                if (event.key === 'Enter') {
-                  void create()
-                }
-              }}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              className="shrink-0"
-              disabled={pending || cleanName === null || nameTaken}
-              onClick={() => void create()}
-            >
-              {busy === 'create' ? <Spinner /> : null}
-              Create
-            </Button>
-          </div>
-          {nameTaken ? (
-            <p className="text-xs text-destructive">That name already exists in iCloud Drive.</p>
-          ) : null}
-        </div>
-      ) : (
-        <div className="mt-auto space-y-2">
-          <div className="space-y-1.5">
-            <label htmlFor={nameId} className="text-xs font-medium text-text-secondary">
-              Name
-            </label>
-            <Input
-              id={nameId}
-              value={name}
-              disabled={!available || pending}
-              onChange={(event) => setTypedName(event.target.value)}
-              onKeyDown={(event) => {
-                if (getIsComposing()) {
-                  return
-                }
-                if (event.key === 'Enter') {
-                  void create()
-                }
-              }}
-            />
-          </div>
-          <Button
-            type="button"
-            className="w-full"
-            disabled={!available || pending || cleanName === null}
-            onClick={() => void create()}
-          >
-            {busy === 'create' ? <Spinner /> : <Cloud aria-hidden strokeWidth={1.75} />}
-            {busy === 'create' ? 'Setting up…' : 'Create'}
-          </Button>
-        </div>
-      )}
-    </section>
-  )
-}
-
-function ChooserDivider({ children }: { children: string }): ReactElement {
-  return (
-    <div className="flex items-center gap-3 py-1">
-      <span aria-hidden className="h-px flex-1 bg-border" />
-      <span className="text-2xs font-medium text-text-muted">{children}</span>
-      <span aria-hidden className="h-px flex-1 bg-border" />
     </div>
   )
 }

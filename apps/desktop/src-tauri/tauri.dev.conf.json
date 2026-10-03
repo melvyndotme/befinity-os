@@ -1,12 +1,12 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Reflect Dev",
-  "identifier": "app.reflect.desktop.dev",
+  "productName": "TACT Notes Dev",
+  "identifier": "ai.befinity.tactnotes.dev",
   "app": {
     "windows": [
       {
         "create": false,
-        "title": "Reflect Dev",
+        "title": "TACT Notes Dev",
         "width": 1300,
         "height": 650,
         "titleBarStyle": "Overlay",

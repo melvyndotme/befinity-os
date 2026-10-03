@@ -11,12 +11,12 @@ import {
 
 /**
  * The first-run seed (Plan 15 step 1): a brand-new graph gets one short,
- * pinned "How to use Reflect" note. It doubles as the optional-setup surface —
+ * pinned "Welcome to TACT Notes" note. It doubles as the optional-setup surface —
  * backup and AI keys are pointers into Settings, not a wizard — so onboarding
  * never gates the editor and "skipping" is just not reading the note.
  */
 
-const WELCOME_TITLE = 'How to use Reflect'
+const WELCOME_TITLE = 'Welcome to TACT Notes'
 
 /** Title-derived slug path, same birth rules as any titled note. */
 export const WELCOME_NOTE_PATH = notePath(slugForTitle(WELCOME_TITLE))
@@ -30,18 +30,18 @@ export const WELCOME_SEEDED_META_KEY = 'welcomeSeeded'
 
 const WELCOME_BODY = `# ${WELCOME_TITLE}
 
-Reflect is a daily notebook: press ⌘D any time to land on today's note and write.
+TACT Notes is your local-first daily notebook. Press ⌘D any time to land on today's note and write.
 
 - **Link as you think.** Type \`[[\` and a title — [[Wiki Links]] connect notes. There are no folders.
 - **Find anything.** ⌘K searches your whole graph; ⌘/ lists every shortcut.
-- **Your files.** Every note is a markdown file in this folder, portable forever.
+- **Your files.** Every note is a Markdown file in this folder, portable forever.
 
 When you want more, open Settings (⌘,):
 
-- **Backup** — free, private backup of your graph to GitHub.
+- **Backup** — private backup of your graph to GitHub.
 - **AI providers** — add your own API key to chat with your notes (⌘J). Notes marked private never leave this device.
 
-This note is pinned to the sidebar — unpin it (⌘O) when you're done.
+Start with the smallest move that compounds. This note is pinned to the sidebar — unpin it (⌘O) when you're done.
 `
 
 export interface EnsureWelcomeNoteOptions {

@@ -107,6 +107,9 @@ interface NotePaneProps {
   onExitBoundary?: (date: string, direction: 'up' | 'down') => boolean
 }
 
+const TACT_MHAG_DAILY_SEED =
+  '## M-HAG: $1m collected by July 2027. What is the smallest move today that compounds?\n\n- '
+
 /**
  * One open note: the editor bound to its on-disk document via the Plan 05 save
  * pipeline (debounced atomic writes, watcher-driven external reload, and a
@@ -163,9 +166,14 @@ export function NotePaneComponent({
     // A missing ordinary note opens as a name-me template (old Reflect's
     // new-note flow): the seed — `id:` frontmatter plus an empty H1 the
     // caret lands in, ghosted "Untitled" by the title placeholder — only
-    // reaches disk if the user edits, and typing names the note. Daily
-    // notes stay unseeded — the date is their identity.
-    ...(needsSeed ? { missingSeed: seed.seed } : {}),
+    // reaches disk if the user edits, and typing names the note. A fresh daily
+    // note starts with the TACT M-HAG and one interstitial bullet; it remains
+    // lazy until the user writes, so merely opening a day never creates a file.
+    ...(dailyNote
+      ? { missingSeed: TACT_MHAG_DAILY_SEED }
+      : needsSeed
+        ? { missingSeed: seed.seed }
+        : {}),
   })
   const {
     resolveImageUrl,
