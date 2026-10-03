@@ -6,12 +6,13 @@ export interface WritableFileHandle {
 }
 
 export interface DirectoryHandle {
+  name: string
   getDirectoryHandle(name: string, options: { create: boolean }): Promise<DirectoryHandle>
   getFileHandle(name: string, options: { create: boolean }): Promise<WritableFileHandle>
 }
 
 type DirectoryPickerWindow = Window & {
-  showDirectoryPicker?: () => Promise<DirectoryHandle>
+  showDirectoryPicker?: (options: { mode: 'readwrite' }) => Promise<DirectoryHandle>
 }
 
 export function supportsFolderWriting(): boolean {
@@ -23,7 +24,32 @@ export async function chooseFolder(): Promise<DirectoryHandle> {
   if (!picker) {
     throw new Error('This browser does not support choosing a local folder yet.')
   }
-  return picker()
+  return picker({ mode: 'readwrite' })
+}
+
+async function writeTextFile(
+  folder: DirectoryHandle,
+  name: string,
+  contents: string,
+): Promise<void> {
+  const file = await folder.getFileHandle(name, { create: true })
+  const writer = await file.createWritable()
+  await writer.write(contents)
+  await writer.close()
+}
+
+export async function initializeVault(folder: DirectoryHandle): Promise<void> {
+  await Promise.all(
+    ['daily', 'notes', 'reviews', 'assets'].map((name) =>
+      folder.getDirectoryHandle(name, { create: true }),
+    ),
+  )
+  const metadata = await folder.getDirectoryHandle('.tact-notes', { create: true })
+  await writeTextFile(
+    metadata,
+    'vault.json',
+    JSON.stringify({ version: 1, createdAt: new Date().toISOString() }, null, 2),
+  )
 }
 
 export async function writeDailyNote(

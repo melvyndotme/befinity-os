@@ -1,22 +1,104 @@
 import { useEffect, useRef, useState } from 'react'
-import { chooseFolder, type DirectoryHandle, supportsFolderWriting, writeDailyNote } from './file-system'
-import { appendCapture, countOpenTasks, dailyNoteTemplate, localDateKey, noteFilePath } from './model'
+import type { Session } from '@supabase/supabase-js'
+import { AuthScreen } from './auth-screen'
+import {
+  chooseFolder,
+  type DirectoryHandle,
+  supportsFolderWriting,
+  writeDailyNote,
+} from './file-system'
+import {
+  appendCapture,
+  countOpenTasks,
+  dailyNoteTemplate,
+  localDateKey,
+  noteFilePath,
+} from './model'
 import { downloadMarkdown, loadDailyNote, saveDailyNote } from './storage'
+import { supabase } from './supabase'
+import { VaultSetup } from './vault-setup'
 
 const dateKey = localDateKey()
 const initialNote = loadDailyNote(dateKey) ?? dailyNoteTemplate(dateKey)
 
+interface VaultRecord {
+  id: string
+  name: string
+  local_folder_label: string
+  git_repository: string | null
+  encryption_mode: 'pending' | 'device_encrypted'
+}
+
 export function App() {
+  const [session, setSession] = useState<Session | null | undefined>(undefined)
+  const [vault, setVault] = useState<VaultRecord | null | undefined>(undefined)
+
+  useEffect(() => {
+    if (!supabase) return
+    void supabase.auth.getSession().then(({ data }) => setSession(data.session))
+    const { data } = supabase.auth.onAuthStateChange((_event, nextSession) =>
+      setSession(nextSession),
+    )
+    return () => data.subscription.unsubscribe()
+  }, [])
+
+  useEffect(() => {
+    if (!supabase || !session) {
+      setVault(undefined)
+      return
+    }
+    setVault(undefined)
+    void supabase
+      .from('tact_notes_vaults')
+      .select('id, name, local_folder_label, git_repository, encryption_mode')
+      .maybeSingle()
+      .then(({ data, error }) => {
+        setVault(error ? null : (data as VaultRecord | null))
+      })
+  }, [session])
+
+  if (!supabase) return <ConfigurationRequired />
+  if (session === undefined) return <Loading message="Loading TACT Notes…" />
+  if (!session) return <AuthScreen />
+  if (vault === undefined) return <Loading message="Checking your vault…" />
+  if (!vault) return <VaultSetup userId={session.user.id} onComplete={() => setVault(undefined)} />
+  return <NotesWorkspace email={session.user.email ?? 'Signed-in user'} vault={vault} />
+}
+
+function Loading({ message }: { message: string }) {
+  return (
+    <main className="auth-page">
+      <p className="loading">{message}</p>
+    </main>
+  )
+}
+
+function ConfigurationRequired() {
+  return (
+    <main className="auth-page">
+      <section className="auth-card">
+        <div className="brand">
+          <span className="brand-mark" /> TACT Notes
+        </div>
+        <h1>Account setup is in progress.</h1>
+        <p className="auth-intro">
+          TACT Notes needs its secured account configuration before it can open a personal vault.
+        </p>
+      </section>
+    </main>
+  )
+}
+
+function NotesWorkspace({ email, vault }: { email: string; vault: VaultRecord }) {
   const [markdown, setMarkdown] = useState(initialNote)
   const [capture, setCapture] = useState('')
   const [folder, setFolder] = useState<DirectoryHandle | null>(null)
-  const [status, setStatus] = useState('Saved privately in this browser')
+  const [status, setStatus] = useState(`Connected to ${vault.name}`)
   const captureRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     saveDailyNote(dateKey, markdown)
   }, [markdown])
-
   useEffect(() => {
     function handleKeydown(event: KeyboardEvent) {
       if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
@@ -41,15 +123,14 @@ export function App() {
 
   async function connectFolder() {
     try {
-      const selectedFolder = await chooseFolder()
-      setFolder(selectedFolder)
-      setStatus('Folder connected for this browser session')
+      const selected = await chooseFolder()
+      setFolder(selected)
+      setStatus(`Local folder connected: ${selected.name}`)
     } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') return
-      setStatus(error instanceof Error ? error.message : 'Could not connect the folder')
+      if (!(error instanceof DOMException && error.name === 'AbortError'))
+        setStatus(error instanceof Error ? error.message : 'Could not connect the folder')
     }
   }
-
   async function saveToFolder() {
     if (!folder) return
     try {
@@ -59,29 +140,53 @@ export function App() {
       setStatus(error instanceof Error ? error.message : 'Could not write the note')
     }
   }
+  async function connectCalendar() {
+    if (!supabase) return
+    setStatus('Opening Google consent for read-only Calendar access…')
+    const { error } = await supabase.auth.linkIdentity({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin,
+        scopes: 'https://www.googleapis.com/auth/calendar.events.readonly',
+      },
+    })
+    if (error) setStatus(error.message)
+  }
+  async function signOut() {
+    if (supabase) await supabase.auth.signOut()
+  }
 
   return (
     <main className="app-shell">
       <aside className="sidebar">
-        <div className="brand"><span className="brand-mark" /> Befinity OS</div>
-        <p className="quiet-label">Your second brain, built around the work.</p>
-
+        <div className="brand">
+          <span className="brand-mark" /> TACT Notes
+        </div>
+        <p className="quiet-label">A local-first working memory for the work behind TACT.</p>
         <nav aria-label="Workspace">
-          <a className="nav-item nav-item-active" href="#today">Today <span>⌘J</span></a>
-          <a className="nav-item" href="#review">Founder review</a>
+          <a className="nav-item nav-item-active" href="#today">
+            Today <span>⌘J</span>
+          </a>
+          <a className="nav-item" href="#review">
+            Founder review
+          </a>
         </nav>
-
         <section className="mhag">
-          <p className="eyebrow">M-HAG</p>
-          <strong>$1m by July 2027</strong>
-          <p>Capture the work first. Your daily review will make sense of it later.</p>
+          <p className="eyebrow">Vault</p>
+          <strong>{vault.name}</strong>
+          <p>
+            {vault.git_repository
+              ? 'Private Git repository recorded.'
+              : 'Git setup still required.'}
+          </p>
         </section>
-
+        <button className="auth-switch sidebar-signout" onClick={() => void signOut()}>
+          {email} · Sign out
+        </button>
         <div className="sidebar-footer">
           <span className="status-dot" /> {status}
         </div>
       </aside>
-
       <section className="workspace" id="today">
         <header className="workspace-header">
           <div>
@@ -89,7 +194,10 @@ export function App() {
             <h1>{dateKey}</h1>
           </div>
           <div className="header-actions">
-            <button className="button button-quiet" onClick={() => downloadMarkdown(`${dateKey}.md`, markdown)}>
+            <button
+              className="button button-quiet"
+              onClick={() => downloadMarkdown(`${dateKey}.md`, markdown)}
+            >
               Download .md
             </button>
             {folder ? (
@@ -103,10 +211,11 @@ export function App() {
             ) : null}
           </div>
         </header>
-
         <section className="capture-card" aria-labelledby="capture-heading">
           <div>
-            <p className="eyebrow" id="capture-heading">Interstitial capture</p>
+            <p className="eyebrow" id="capture-heading">
+              Interstitial capture
+            </p>
             <p className="capture-prompt">What just happened, or what needs your attention?</p>
           </div>
           <textarea
@@ -122,11 +231,14 @@ export function App() {
               Add to today <kbd>⌘↵</kbd>
             </button>
           </div>
-          <p className="hint">No category required. Voice memos, daily review, and suggested links come after capture.</p>
+          <p className="hint">
+            No category required. Daily review and suggested links come after capture.
+          </p>
         </section>
-
         <section className="editor-card">
-          <label className="editor-label" htmlFor="daily-markdown">Today’s Markdown</label>
+          <label className="editor-label" htmlFor="daily-markdown">
+            Today’s Markdown
+          </label>
           <textarea
             id="daily-markdown"
             className="editor"
@@ -139,7 +251,6 @@ export function App() {
           />
         </section>
       </section>
-
       <aside className="review-panel" id="review">
         <p className="eyebrow">Founder review</p>
         <h2>Keep the system honest.</h2>
@@ -152,12 +263,18 @@ export function App() {
           <p>Capture first. Classify later. Do not let the tool become the work.</p>
         </div>
         <div className="review-card">
-          <p className="review-title">Storage</p>
-          <p>Browser-local by default. Choose a cloned private vault to write <code>{noteFilePath(dateKey)}</code>.</p>
+          <p className="review-title">Calendar</p>
+          <p>Connect a Google calendar only when you want to turn an event into a local note.</p>
+          <button className="button button-quiet" onClick={() => void connectCalendar()}>
+            Connect read-only Google Calendar
+          </button>
         </div>
         <div className="review-card muted-card">
           <p className="review-title">Daily review agent</p>
-          <p>It will propose categories, links, tasks, and a short learning summary. You decide what becomes permanent.</p>
+          <p>
+            It will propose categories, links, tasks, and a short learning summary. You decide what
+            becomes permanent.
+          </p>
         </div>
       </aside>
     </main>

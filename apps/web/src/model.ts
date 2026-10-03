@@ -15,11 +15,7 @@ export function dailyNoteTemplate(dateKey: string): string {
   return `---\ndate: ${dateKey}\ntype: daily\n---\n\n# ${dateKey}\n\n## M-HAG\n\n$1m collected by July 2027. What is the smallest move today that compounds?\n\n`
 }
 
-export function appendCapture(
-  current: string,
-  text: string,
-  capturedAt = new Date(),
-): string {
+export function appendCapture(current: string, text: string, capturedAt = new Date()): string {
   const body = text.trim()
   if (!body) return current
 
