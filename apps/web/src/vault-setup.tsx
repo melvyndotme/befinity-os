@@ -28,26 +28,42 @@ export function VaultSetup({ userId, onComplete }: VaultSetupProps) {
 
   async function saveSetup(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!supabase || !folder) return
-    setBusy(true)
-    setMessage('')
-    const { error } = await supabase.from('tact_notes_vaults').upsert(
-      {
-        user_id: userId,
-        name: name.trim(),
-        local_folder_label: folder.name,
-        git_provider: 'github',
-        git_repository: gitRepository.trim(),
-        encryption_mode: 'pending',
-      },
-      { onConflict: 'user_id' },
-    )
-    setBusy(false)
-    if (error) {
-      setMessage(error.message)
+    if (!folder) {
+      setMessage('Choose a local folder before saving your vault setup.')
       return
     }
-    onComplete()
+    if (!supabase) {
+      setMessage('TACT Notes account configuration is unavailable. Refresh the page and try again.')
+      return
+    }
+    setBusy(true)
+    setMessage('')
+    try {
+      const { error } = await supabase.from('tact_notes_vaults').upsert(
+        {
+          user_id: userId,
+          name: name.trim(),
+          local_folder_label: folder.name,
+          git_provider: 'github',
+          git_repository: gitRepository.trim(),
+          encryption_mode: 'pending',
+        },
+        { onConflict: 'user_id' },
+      )
+      if (error) {
+        setMessage(`Could not save the vault setup: ${error.message}`)
+        return
+      }
+      onComplete()
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? `Could not save the vault setup: ${error.message}`
+          : 'Could not save the vault setup. Please try again.',
+      )
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -87,6 +103,7 @@ export function VaultSetup({ userId, onComplete }: VaultSetupProps) {
           <button className="button button-primary" disabled={!folder || busy} type="submit">
             {busy ? 'Saving…' : 'Save vault setup'}
           </button>
+          {!folder && <p className="field-hint">Choose a local folder to enable saving.</p>}
         </form>
         {message && (
           <p className="auth-message" role="status">
